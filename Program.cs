@@ -14,6 +14,9 @@ namespace DS3_Switcher
         public static string path = Directory.GetCurrentDirectory() + "\\";
         //public static string path = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) + @"\DS3Switcher\";
         public static long steamID64;
+        public static string dll;
+        public static string ini;
+        public static string idPath;
 
         public static bool config = false;
         public static string ds3Path = "";
@@ -187,8 +190,9 @@ namespace DS3_Switcher
     static class DLLChecker
     {
         private static string dll = @"dinput8.dll";
+        private static string ini = @"modengine.ini";
 
-        //checks for the dll in specified dark souls folder
+        //checks for dinput8.dll in specified dark souls folder
         private static bool DLLInDS3()
         {
             if (File.Exists(Globals.ds3Path + dll))
@@ -197,42 +201,120 @@ namespace DS3_Switcher
                 return false;
         }
 
-        //removes the dll from the dark souls folder
-        public static int RemoveDLL()
+        //checks for modengine.ini in specified dark souls folder
+        private static bool INIInDS3()
         {
-            if (!DLLInDS3())
+            if (File.Exists(Globals.ds3Path + ini))
+                return true;
+            else
+                return false;
+        }
+
+        //checks for both files in the specified dark souls folder
+        private static bool FilesInDS3()
+        {
+            if (DLLInDS3() && INIInDS3())
+                return true;
+            else
+                return false;
+        }
+
+        //removes both files from the dark souls folder
+        public static int RemoveFiles()
+        {
+            if (!FilesInDS3())
                 return 0;
 
-            if (!File.Exists(Globals.path + dll))
-                File.Copy(Globals.ds3Path + dll, Globals.path + dll);
+            if (DLLInDS3())
+                File.Delete(Globals.ds3Path + dll);
 
-            File.Delete(Globals.ds3Path + dll);
+            if (INIInDS3())
+                File.Delete(Globals.ds3Path + ini);
 
-            if (!DLLInDS3())
+            if (!FilesInDS3())
                 return 0;
             else
                 return 1;
         }
 
-        //adds the dll to the dark souls folder
-        public static int InsertDLL()
+        //loads the current configuration saved in the id's folder
+        public static int LoadCurConfig()
         {
-            if (DLLInDS3())
-                return 0;
+            if (RemoveFiles() == 0)
+            {
+                try
+                {
+                    File.Copy(Globals.idPath + dll, Globals.ds3Path + dll);
+                }
+                catch
+                {
+                    throw new Exception("dinput8.dll not found! Are there any mods installed?");
+                }
+
+                try
+                {
+                    File.Copy(Globals.idPath + ini, Globals.ds3Path + ini);
+                }
+                catch
+                {
+                    throw new Exception("modengine.ini not found! Are there any mods installed?");
+                }
+
+                if (FilesInDS3())
+                    return 0;
+                else
+                    return 1;
+            }
+            else
+                return 1;
+        }
+
+        //saves the current configuration in the dark souls folder
+        public static int SaveCurConfig()
+        {
+            char sure;
+
+            Console.WriteLine("Would you like to save the current configuration to this ID?");
+            Console.WriteLine("(The dinput8.dll and modengine.ini in your Dark Souls 3 directory will be saved)");
+            do
+            {
+                Console.WriteLine("Please indicate your response with the y(es) or n(o) key.");
+                sure = Console.ReadLine()[0];
+            } while (sure != 'y' && sure != 'n');
+
+            if (sure == 'n')
+            {
+                Console.WriteLine("Current configuration not saved.");
+                return 1;
+            }
 
             try
             {
-                File.Copy(Globals.path + dll, Globals.ds3Path + dll);
+                File.Delete(Globals.idPath + dll);
+                File.Delete(Globals.idPath + ini);
+
+                File.Copy(Globals.ds3Path + dll, Globals.idPath + dll);
+                File.Copy(Globals.ds3Path + ini, Globals.idPath + ini);
             }
             catch
             {
-                throw new Exception("DLL not found! Are there any mods installed?");
+                throw new Exception("Unable to save config! Are there any mods installed?");
             }
 
-            if (DLLInDS3())
-                return 0;
+            Console.WriteLine("\nCurrent configuration saved to id " + Globals.steamID64);
+            Console.WriteLine("(Start DS3Switcher in config mode to overwrite current configuration)");
+            return 0;
+        }
+
+        //checks for an existing configuration in the id's folder
+        public static bool ConfigExists(long id)
+        {
+            Directory.CreateDirectory(Globals.idPath);
+
+            if (File.Exists(Globals.idPath + dll) && File.Exists(Globals.idPath + ini))
+                return true;
             else
-                return 1;
+                return false;
         }
     }
 
@@ -332,17 +414,17 @@ namespace DS3_Switcher
                     Console.WriteLine("4) Switch current account to UNMODDED");
                 else
                     Console.WriteLine("4) Switch current account to MODDED");
-                Console.WriteLine("5) Exit and Save\n");
+                Console.WriteLine("5) Save Current Mod Configuration to ID");
+                Console.WriteLine("6) Exit and Save\n");
 
                 Console.WriteLine("Select an option: ");
 
                 do
                 {
-
                     try
                     {
                         option = Convert.ToInt32(Console.ReadLine()[0]) - 48;
-                        if (option < 1 || option > 5)
+                        if (option < 1 || option > 6)
                         {
                             option = -1;
                             throw new Exception("Option outside of range.");
@@ -369,6 +451,12 @@ namespace DS3_Switcher
                         ModdedToggle(Globals.steamID64);
                         break;
                     case 5:
+                        if (Globals.ds3Path != "")
+                            DLLChecker.SaveCurConfig();
+                        else
+                            Console.WriteLine("Please set the path to your DS3 Folder.");
+                        break;
+                    case 6:
                         if (Globals.ds3Path != "")
                             Globals.config = true;
                         RewriteGlobals();
@@ -564,6 +652,7 @@ namespace DS3_Switcher
         {
             ReadGlobals();
             Globals.steamID64 = Steam.FetchSteamID64();
+            Globals.idPath = Globals.path + Globals.steamID64 + "\\";
             if (Globals.steamID64 == 76561197960265728)
                 throw new Exception("Not signed into Steam! Please sign in.");
             IDList.InitList(Globals.steamID64);
@@ -583,18 +672,30 @@ namespace DS3_Switcher
 
             if (IDList.IDIsModded(Globals.steamID64))
             {
-                if (DLLChecker.InsertDLL() == 0)
+                if (!DLLChecker.ConfigExists(Globals.steamID64))
+                {
+                    Console.WriteLine("No configuration saved for the current ID!");
+                    if (DLLChecker.SaveCurConfig() == 1)
+                    {
+                        Console.WriteLine("Please make sure the correct mods for the current ID are installed.");
+                        Console.WriteLine("Additionally, make sure modengine.ini is set up as desired.");
+                        Console.WriteLine("\nPress any key to continue..."); Console.ReadKey(true); Console.WriteLine();
+                        Environment.Exit(0);
+                    }
+                    Console.WriteLine("\nPress any key to continue..."); Console.ReadKey(true); Console.WriteLine();
+                }
+
+                if (DLLChecker.LoadCurConfig() == 0)
                 {
                     AppStarter.StartDS3();
                     Environment.Exit(0);
                 }
-
                 else
                     throw new Exception("Unable to insert DLL into Dark Souls 3 folder, game not started.");
             }
             else
             {
-                if (DLLChecker.RemoveDLL() == 0)
+                if (DLLChecker.RemoveFiles() == 0)
                 {
                     AppStarter.StartDS3();
                     Environment.Exit(0);
