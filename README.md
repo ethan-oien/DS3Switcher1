@@ -12,6 +12,7 @@ List of registered IDs is kept in switcherIDs.txt, while the backup dinput8.dll 
 
 
 ------ USAGE ------
+
 Simply make a shortcut to the .exe, and launch that instead of your normal DARK SOULS III shortcut.
 If everything is set up correctly, a console window will flash on screen briefly, before starting Dark Souls 3.
 
@@ -26,6 +27,7 @@ Arguments is to set the run arguments on the application launched, which is set 
 
 
 ------ INSTALLATION -----
+
 1) Make sure that Dark Souls III is modded (there is a dinput8.dll in the Dark Souls Game folder).
 2) Launch DS3Switcher.exe in a dedicated directory/folder.
 3) The program will create 3 files in the directory, DO NOT EDIT THEM.
